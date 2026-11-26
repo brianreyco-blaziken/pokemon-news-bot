@@ -90,14 +90,24 @@ def make_id(day_id, title, body):
     return hashlib.sha1(key.encode("utf-8")).hexdigest()[:16]
 
 
+# Headings too general to say which game an item is about. For these the
+# news text is checked instead.
+GENERIC_TITLES = {"pokémon", "pokemon", "the pokémon company", "nintendo", "nintendo direct", "pokémon presents"}
+
+
 def match_game(item):
-    """Return the game an item is about, or None. The title is checked first."""
+    """Return the game an item is about, or None.
+
+    Items are matched by their heading (e.g. "Pokémon Champions - Regulation M-D"),
+    so a Pokémon GO item that only mentions Champions in passing is skipped.
+    """
     for game in GAMES:
         if game["pattern"].search(item["title"]):
             return game
-    for game in GAMES:
-        if game["pattern"].search(item["body"]):
-            return game
+    if item["title"].strip().lower() in GENERIC_TITLES:
+        for game in GAMES:
+            if game["pattern"].search(item["body"]):
+                return game
     return None
 
 
