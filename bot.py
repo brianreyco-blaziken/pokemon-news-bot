@@ -9,7 +9,10 @@ import os
 import re
 import sys
 import time
+from datetime import datetime
+from datetime import time as clock
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import requests
 from bs4 import BeautifulSoup
@@ -17,6 +20,12 @@ from bs4 import BeautifulSoup
 SEREBII_URL = "https://www.serebii.net/"
 SEEN_FILE = Path(__file__).with_name("seen.json")
 MAX_POSTS_PER_RUN = 5  # stops a flood of messages if a lot is new at once
+
+# Quiet hours: nothing is posted between these times (New York time, adjusts
+# for daylight saving automatically). News found overnight is posted after.
+TIMEZONE = ZoneInfo("America/New_York")
+QUIET_START = clock(0, 0)   # midnight
+QUIET_END = clock(7, 30)    # 7:30am
 
 # Games to follow. Add more by copying a block: a name, a Discord embed
 # colour, and a pattern that matches how Serebii writes the game's name.
@@ -150,10 +159,21 @@ def save_seen(seen):
     SEEN_FILE.write_text(json.dumps(seen[-500:], indent=0) + "\n")
 
 
+def in_quiet_hours(now=None):
+    now = (now or datetime.now(TIMEZONE)).time()
+    if QUIET_START <= QUIET_END:
+        return QUIET_START <= now < QUIET_END
+    return now >= QUIET_START or now < QUIET_END  # window that crosses midnight
+
+
 def main():
     webhook_url = os.environ.get("DISCORD_WEBHOOK_URL")
     if not webhook_url:
         sys.exit("DISCORD_WEBHOOK_URL is not set. Add it as a repository secret.")
+
+    if in_quiet_hours():
+        print("Quiet hours: not posting right now.")
+        return
 
     seen = load_seen()
     seen_set = set(seen)
